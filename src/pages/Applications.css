@@ -1,0 +1,228 @@
+.applications{
+    background:#111827;
+    border-radius:18px;
+    padding:28px;
+    margin-top:25px;
+}
+
+.applications-header{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:25px;
+}
+
+.applications-header h2{
+    color:white;
+}
+
+.search{
+    width:260px;
+    background:#1f2937;
+    border:none;
+    color:white;
+    padding:12px 16px;
+    border-radius:12px;
+    outline:none;
+}
+
+.filters{
+    display:flex;
+    gap:15px;
+    margin-bottom:20px;
+}
+
+.filters select{
+    background:#1f2937;
+    color:white;
+    border:none;
+    padding:10px 16px;
+    border-radius:10px;
+}
+
+table{
+    width:100%;
+    border-collapse:collapse;
+}
+
+thead{
+    color:#94a3b8;
+    text-align:left;
+}
+
+thead th{
+    padding-bottom:18px;
+    font-weight:500;
+}
+
+tbody td{
+    padding:18px 0;
+    color:white;
+    border-top:1px solid #1f2937;
+}
+
+.badge{
+    padding:6px 12px;
+    border-radius:20px;
+    font-size:13px;
+}
+
+.pending{
+    background:#78350f;
+    color:#fbbf24;
+}
+
+.approved{
+    background:#064e3b;
+    color:#34d399;
+}
+
+.rejected{
+    background:#7f1d1d;
+    color:#f87171;
+}
+
+.applications {
+  width: 100%;
+  padding: 32px;
+  box-sizing: border-box;
+}
+
+.applications-header{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:25px;
+}
+
+.applications-header h2{
+    color:white;
+    font-size:30px;
+}
+
+.search{
+    width:320px;
+    height:46px;
+    border:none;
+    outline:none;
+    border-radius:12px;
+    padding:0 16px;
+    background:#181818;
+    color:white;
+}
+
+.filters{
+    display:flex;
+    gap:12px;
+    margin-bottom:30px;
+}
+
+.filters select{
+    height:42px;
+    border:none;
+    outline:none;
+    border-radius:10px;
+    padding:0 14px;
+    background:#181818;
+    color:white;
+}
+.cards {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.application-card {
+  width: 100%;
+  background: #141414;
+  border: 1px solid #222;
+  border-radius: 18px;
+  padding: 24px;
+  transition: 0.2s;
+}
+
+.application-card:hover {
+  border-color: #23ee09;
+  transform: translateY(-2px);
+}
+
+.top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 18px;
+}
+
+.gym-name {
+  font-size: 26px;
+  font-weight: 700;
+  color: white;
+}
+
+.owner-name {
+  color: #23ee09;
+  margin-top: 6px;
+  font-size: 15px;
+}
+
+.address {
+  color: #b5b5b5;
+  margin-bottom: 24px;
+  line-height: 1.6;
+}
+
+.info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.info-box {
+  background: #1c1c1c;
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.info-box.full {
+  grid-column: 1 / -1;
+}
+
+.info-box label {
+  color: #777;
+  font-size: 12px;
+  text-transform: uppercase;
+  display: block;
+  margin-bottom: 8px;
+}
+
+.info-box p {
+  color: white;
+  word-break: break-word;
+  margin: 0;
+}
+
+.price-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+
+.price-card {
+  background: #191919;
+  border: 1px solid #2b2b2b;
+  border-radius: 14px;
+  padding: 18px;
+  text-align: center;
+}
+
+.price-card h4 {
+  color: #888;
+  margin-bottom: 10px;
+}
+
+.price-card p {
+  color: #23ee09;
+  font-size: 22px;
+  font-weight: bold;
+}
