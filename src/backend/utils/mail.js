@@ -17,13 +17,15 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-transporter.verify((error, success) => {
-  if (error) {
-    console.error("❌ Transport verify failed:");
-    console.error(error);
-  } else {
-    console.log("✅ Mail transporter is ready.");
-  }
-});
+if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
+  transporter.verify((error) => {
+    if (error) {
+      console.error("❌ Transport verify failed:");
+      console.error(error);
+    } else {
+      console.log("✅ Mail transporter is ready.");
+    }
+  });
+}
 
 export default transporter;

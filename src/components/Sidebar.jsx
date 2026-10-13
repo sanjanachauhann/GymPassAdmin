@@ -8,6 +8,7 @@ import {
   CreditCard,
   BarChart3,
   Settings,
+  LogOut,
 } from "lucide-react";
 
 const menuItems = [
@@ -49,19 +50,26 @@ const menuItems = [
   },
 ];
 
-export default function Sidebar() {
+export default function Sidebar({
+  onLogout,
+  currentPage,
+  onNavigate,
+}) {
   return (
     <aside
       style={{
         width: 260,
+        minWidth: 260,
         background: "#0D0D0D",
         borderRight: "1px solid #1E1E1E",
         display: "flex",
         flexDirection: "column",
         height: "100vh",
         padding: 24,
+        boxSizing: "border-box",
       }}
     >
+      {/* Logo */}
       <h1
         style={{
           color: "#00F5D4",
@@ -73,32 +81,42 @@ export default function Sidebar() {
         GymPass
       </h1>
 
+      {/* Navigation */}
       <div
         style={{
           display: "flex",
           flexDirection: "column",
           gap: 8,
+          flex: 1,
         }}
       >
-        {menuItems.map((item, index) => {
+        {menuItems.map((item) => {
           const Icon = item.icon;
 
           return (
             <button
               key={item.title}
+              onClick={() => onNavigate(item.title)}
               style={{
                 display: "flex",
                 alignItems: "center",
                 gap: 14,
                 border: "none",
                 background:
-                  index === 0 ? "rgba(0,245,212,.15)" : "transparent",
-                color: index === 0 ? "#00F5D4" : "#AAA",
+                  currentPage === item.title
+                    ? "rgba(0,245,212,.15)"
+                    : "transparent",
+                color:
+                  currentPage === item.title
+                    ? "#00F5D4"
+                    : "#AAA",
                 padding: "14px 16px",
                 borderRadius: 14,
                 fontSize: 16,
                 cursor: "pointer",
                 transition: ".2s",
+                textAlign: "left",
+                width: "100%",
               }}
             >
               <Icon size={20} />
@@ -108,6 +126,28 @@ export default function Sidebar() {
           );
         })}
       </div>
+
+      {/* Logout */}
+      <button
+        onClick={onLogout}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 14,
+          border: "1px solid #292929",
+          background: "transparent",
+          color: "#AAA",
+          padding: "14px 16px",
+          borderRadius: 14,
+          fontSize: 16,
+          cursor: "pointer",
+          textAlign: "left",
+          width: "100%",
+        }}
+      >
+        <LogOut size={20} />
+        Logout
+      </button>
     </aside>
   );
-} 
+}

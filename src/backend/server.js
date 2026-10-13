@@ -7,6 +7,15 @@ dotenv.config();
 import adminRoutes from "./routes/admin.js";
 
 const app = express();
+const requiredEnv = ["MONGO_URI", "JWT_SECRET"];
+const missingEnv = requiredEnv.filter((key) => !process.env[key]);
+
+if (missingEnv.length > 0) {
+  console.error(
+    `Missing required environment variables: ${missingEnv.join(", ")}`,
+  );
+  process.exit(1);
+}
 
 app.use(cors());
 app.use(express.json());

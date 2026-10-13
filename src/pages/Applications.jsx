@@ -1,28 +1,41 @@
 import "./Applications.css";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import ApplicationDrawer from "../components/ApplicationDrawer";
-import { useEffect } from "react";
-import { approveApplication, getApplications, rejectApplication } from "../api/admin";
+import {
+  approveApplication,
+  getApplications,
+  rejectApplication,
+} from "../api/admin";
 
 export default function Applications() {
+  const [selectedGym, setSelectedGym] = useState(null);
+  const [gyms, setGyms] = useState([]);
+  const [processingAction, setProcessingAction] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  const loadApplications = async () => {
+    try {
+      setLoading(true);
+      setError("");
+
+      const data = await getApplications();
+
+      setGyms(Array.isArray(data.applications) ? data.applications : []);
+    } catch (err) {
+      console.error("Failed to load applications:", err);
+      setError(
+        err.response?.data?.message ||
+          "Failed to load applications.",
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-  loadApplications();
-}, []);
-
-const loadApplications = async () => {
-  try {
-    const data = await getApplications();
-    setGyms(data);
-  } catch (err) {
-    console.log(err);
-  }
-};
-
-
-const [selectedGym, setSelectedGym] = useState(null);
-const [gyms, setGyms] = useState([]);
-const [processingAction, setProcessingAction] = useState(null);
-
+    loadApplications();
+  }, []);
 
   return (
     <div className="applications">
@@ -51,6 +64,24 @@ const [processingAction, setProcessingAction] = useState(null);
         </select>
 
       </div>
+
+      {error && (
+        <div className="application-error">
+          {error}
+        </div>
+      )}
+
+      {loading && (
+        <div className="application-empty">
+          Loading applications...
+        </div>
+      )}
+
+      {!loading && !error && gyms.length === 0 && (
+        <div className="application-empty">
+          No applications found.
+        </div>
+      )}
 
       {/* <table>
 
@@ -95,6 +126,7 @@ const [processingAction, setProcessingAction] = useState(null);
         </tbody>
 
       </table> */}
+{!loading && gyms.length > 0 && (
 <div className="cards">
   {gyms.map((gym) => (
     <div
@@ -192,6 +224,7 @@ const [processingAction, setProcessingAction] = useState(null);
     </div>
   ))}
 </div>
+)}
 {/* <ApplicationDrawer
     gym={selectedGym}
     onClose={() => setSelectedGym(null)}

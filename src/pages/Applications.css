@@ -126,6 +126,24 @@ tbody td{
     background:#181818;
     color:white;
 }
+
+.application-error,
+.application-empty {
+  background: #181818;
+  border: 1px solid #2b2b2b;
+  border-radius: 14px;
+  color: #aaa;
+  margin-bottom: 24px;
+  padding: 24px;
+  text-align: center;
+}
+
+.application-error {
+  background: #2a1111;
+  border-color: #4a2020;
+  color: #ff6b6b;
+}
+
 .cards {
   display: flex;
   flex-direction: column;
