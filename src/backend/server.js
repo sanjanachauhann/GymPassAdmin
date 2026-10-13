@@ -24,7 +24,6 @@ app.use(express.json());
 app.use("/api/admin", adminRoutes);
 
 app.get("/", (req, res) => {
-  console.log(process.env.MONGO_URI);
   res.send("Backend Running");
 });
 
