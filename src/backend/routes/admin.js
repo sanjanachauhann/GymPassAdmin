@@ -275,7 +275,6 @@ router.put("/applications/:id/approve", adminAuth, async (req, res) => {
 
     try {
       console.log("Partner invite link:", inviteLink);
-
       await transporter.sendMail({
         from: process.env.EMAIL_USER,
         to: request.email,
@@ -323,6 +322,31 @@ router.put("/applications/:id/approve", adminAuth, async (req, res) => {
     });
   }
 });
+
+// router.put("/applications/:id/approve", adminAuth, async (req, res) => {
+//   try {
+//     await transporter.sendMail({
+//       to: "sanjana.chauhan2007@gmail.com",
+//       subject: "GymPass Test Email",
+//       text: "Hello! This is a test email from GymPass Admin. Email delivery is working.",
+//     });
+
+//     console.log("✅ Test email sent successfully");
+
+//     return res.json({
+//       success: true,
+//       message: "Test email sent successfully!",
+//     });
+//   } catch (error) {
+//     console.error("❌ Email failed:", error.message);
+
+//     return res.status(500).json({
+//       success: false,
+//       message: "Failed to send test email",
+//       error: error.message,
+//     });
+//   }
+// });
 
 // Reject application
 // PUT /api/admin/applications/:id/reject
@@ -543,7 +567,14 @@ router.post("/admins", superadminAuth, async (req, res) => {
       inviteExpires: new Date(Date.now() + 24 * 60 * 60 * 1000),
     });
 
-    const inviteLink = `http://localhost:5173/admin/setup-password?token=${inviteToken}`;
+    // const inviteLink = `http://localhost:5173/admin/setup-password?token=${inviteToken}`;
+    const adminFrontendUrl = process.env.ADMIN_FRONTEND_URL;
+
+    if (!adminFrontendUrl) {
+      throw new Error("ADMIN_FRONTEND_URL is not configured");
+    }
+
+    const inviteLink = `${adminFrontendUrl}/admin/setup-password?token=${inviteToken}`;
 
     try {
       await transporter.sendMail({

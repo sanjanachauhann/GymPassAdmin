@@ -315,7 +315,7 @@ const renderPage = () => {
       return <AdminManagement />;
 
     case "Dashboard":
-      return <Applications/>; 
+      return <Dashboard/>; 
       
     default:
       return <Dashboard />;

@@ -7,7 +7,10 @@ import {
   rejectApplication,
 } from "../api/admin";
 
-export default function Applications() {
+
+
+
+export default function Applications({ onRefreshComplete }) {
   const [selectedGym, setSelectedGym] = useState(null);
   const [gyms, setGyms] = useState([]);
   const [processingAction, setProcessingAction] = useState(null);
@@ -30,6 +33,7 @@ export default function Applications() {
       );
     } finally {
       setLoading(false);
+       onRefreshComplete?.();
     }
   };
 
