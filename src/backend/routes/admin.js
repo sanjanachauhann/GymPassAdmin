@@ -568,7 +568,7 @@ router.post("/admins", superadminAuth, async (req, res) => {
     });
 
     // const inviteLink = `http://localhost:5173/admin/setup-password?token=${inviteToken}`;
-    const adminFrontendUrl = process.env.ADMIN_FRONTEND_URL;
+    const adminFrontendUrl = process.env.ADMIN_INVITE_URL;
 
     if (!adminFrontendUrl) {
       throw new Error("ADMIN_FRONTEND_URL is not configured");
