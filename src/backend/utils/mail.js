@@ -16,7 +16,6 @@ console.log(
 //     pass: process.env.EMAIL_PASS,
 //   },
 // });
-import nodemailer from "nodemailer";
 
 const transporter = nodemailer.createTransport({
   host: "smtp.gmail.com",
