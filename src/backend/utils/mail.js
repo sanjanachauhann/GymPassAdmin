@@ -2,39 +2,129 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-const BREVO_URL = "https://api.brevo.com/v3/smtp/email";
+// Sends mail through the Gmail API over HTTPS (port 443), so Render's
+// SMTP-port block doesn't apply. Same interface as the old transporter:
+//   transporter.sendMail({ to, subject, html, text })
+//
+// Required env vars on Render:
+//   EMAIL_USER           the Gmail address that sends (e.g. gympassadmin@gmail.com)
+//   GMAIL_CLIENT_ID      OAuth client id from Google Cloud
+//   GMAIL_CLIENT_SECRET  OAuth client secret
+//   GMAIL_REFRESH_TOKEN  refresh token for EMAIL_USER (scope: gmail.send)
 
-// Same interface as the old Nodemailer/Resend transporter,
-// so the calls in your routes (transporter.sendMail({...})) don't change.
+const TOKEN_URL = "https://oauth2.googleapis.com/token";
+const SEND_URL = "https://gmail.googleapis.com/gmail/v1/users/me/messages/send";
+
+let cachedToken = null;
+let cachedExpiry = 0;
+
+async function getAccessToken() {
+  if (cachedToken && Date.now() < cachedExpiry - 60_000) return cachedToken;
+
+  const { GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET, GMAIL_REFRESH_TOKEN } =
+    process.env;
+
+  if (!GMAIL_CLIENT_ID || !GMAIL_CLIENT_SECRET || !GMAIL_REFRESH_TOKEN) {
+    throw new Error(
+      "GMAIL_CLIENT_ID, GMAIL_CLIENT_SECRET and GMAIL_REFRESH_TOKEN must be set",
+    );
+  }
+
+  const res = await fetch(TOKEN_URL, {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      client_id: GMAIL_CLIENT_ID,
+      client_secret: GMAIL_CLIENT_SECRET,
+      refresh_token: GMAIL_REFRESH_TOKEN,
+      grant_type: "refresh_token",
+    }),
+    signal: AbortSignal.timeout(15000),
+  });
+
+  const data = await res.json().catch(() => ({}));
+
+  if (!res.ok || !data.access_token) {
+    throw new Error(
+      `Google token error ${res.status}: ${data.error_description || data.error || "unknown"}`,
+    );
+  }
+
+  cachedToken = data.access_token;
+  cachedExpiry = Date.now() + (data.expires_in || 3600) * 1000;
+  return cachedToken;
+}
+
+function encodeHeader(value) {
+  // RFC 2047 so non-ASCII subjects survive
+  return /^[\x20-\x7e]*$/.test(value)
+    ? value
+    : `=?UTF-8?B?${Buffer.from(value, "utf8").toString("base64")}?=`;
+}
+
+function buildMime({ from, to, subject, html, text }) {
+  const headers = [
+    `From: GymPass <${from}>`,
+    `To: ${to.join(", ")}`,
+    `Subject: ${encodeHeader(subject || "")}`,
+    "MIME-Version: 1.0",
+  ];
+
+  if (html && text) {
+    const boundary = `b_${Date.now().toString(36)}`;
+    return [
+      ...headers,
+      `Content-Type: multipart/alternative; boundary="${boundary}"`,
+      "",
+      `--${boundary}`,
+      'Content-Type: text/plain; charset="UTF-8"',
+      "Content-Transfer-Encoding: base64",
+      "",
+      Buffer.from(text, "utf8").toString("base64"),
+      `--${boundary}`,
+      'Content-Type: text/html; charset="UTF-8"',
+      "Content-Transfer-Encoding: base64",
+      "",
+      Buffer.from(html, "utf8").toString("base64"),
+      `--${boundary}--`,
+    ].join("\r\n");
+  }
+
+  const isHtml = Boolean(html);
+  return [
+    ...headers,
+    `Content-Type: ${isHtml ? "text/html" : "text/plain"}; charset="UTF-8"`,
+    "Content-Transfer-Encoding: base64",
+    "",
+    Buffer.from(html || text || "", "utf8").toString("base64"),
+  ].join("\r\n");
+}
+
 const transporter = {
   async sendMail(options) {
-    const apiKey = process.env.BREVO_API_KEY;
-    const senderEmail = process.env.MAIL_FROM || process.env.EMAIL_USER;
+    const from = process.env.EMAIL_USER;
+    if (!from) throw new Error("EMAIL_USER is not configured");
 
-    if (!apiKey) throw new Error("BREVO_API_KEY is not configured");
-    if (!senderEmail) throw new Error("MAIL_FROM is not configured");
+    const to = Array.isArray(options.to) ? options.to : [options.to];
+    const accessToken = await getAccessToken();
 
-    const recipients = (
-      Array.isArray(options.to) ? options.to : [options.to]
-    ).map((email) => ({ email }));
+    const raw = Buffer.from(
+      buildMime({
+        from,
+        to,
+        subject: options.subject,
+        html: options.html,
+        text: options.text,
+      }),
+    ).toString("base64url");
 
-    const body = {
-      sender: { name: "GymPass", email: senderEmail },
-      to: recipients,
-      subject: options.subject,
-    };
-
-    if (options.html) body.htmlContent = options.html;
-    if (options.text) body.textContent = options.text;
-
-    const res = await fetch(BREVO_URL, {
+    const res = await fetch(SEND_URL, {
       method: "POST",
       headers: {
-        accept: "application/json",
+        authorization: `Bearer ${accessToken}`,
         "content-type": "application/json",
-        "api-key": apiKey,
       },
-      body: JSON.stringify(body),
+      body: JSON.stringify({ raw }),
       signal: AbortSignal.timeout(15000),
     });
 
@@ -42,93 +132,20 @@ const transporter = {
 
     if (!res.ok) {
       throw new Error(
-        `Brevo ${res.status}: ${data.message || JSON.stringify(data)}`,
+        `Gmail API ${res.status}: ${data.error?.message || JSON.stringify(data)}`,
       );
     }
 
-    return {
-      messageId: data.messageId,
-      accepted: recipients.map((r) => r.email),
-    };
+    console.log("📧 Email sent via Gmail API:", data.id, "->", to.join(", "));
+
+    return { messageId: data.id, accepted: to };
   },
 };
 
 console.log(
-  process.env.BREVO_API_KEY
-    ? "✅ Brevo mail transport configured"
-    : "❌ BREVO_API_KEY missing",
+  process.env.GMAIL_REFRESH_TOKEN
+    ? "✅ Gmail API mail transport configured"
+    : "❌ GMAIL_REFRESH_TOKEN missing",
 );
 
 export default transporter;
-
-// import { Resend } from "resend";
-// import dotenv from "dotenv";
-
-// dotenv.config();
-
-// const resend = new Resend(process.env.RESEND_API_KEY);
-
-// const transporter = {
-//   async sendMail(options) {
-//     const result = await resend.emails.send({
-//       from: process.env.EMAIL_USER,
-//       to: Array.isArray(options.to) ? options.to : [options.to],
-//       subject: options.subject,
-//       html: options.html,
-//       text: options.text,
-//     });
-
-//     if (result.error) {
-//       throw new Error(result.error.message);
-//     }
-
-//     return {
-//       messageId: result.data?.id,
-//       accepted: options.to,
-//     };
-//   },
-// };
-
-// export default transporter;
-// // import nodemailer from "nodemailer";
-// // import dotenv from "dotenv";
-
-// // dotenv.config();
-
-// // console.log("EMAIL_USER:", process.env.EMAIL_USER);
-// // console.log(
-// //   "EMAIL_PASS length:",
-// //   process.env.EMAIL_PASS ? process.env.EMAIL_PASS.length : "Missing",
-// // );
-
-// // // const transporter = nodemailer.createTransport({
-// // //   service: "gmail",
-// // //   auth: {
-// // //     user: process.env.EMAIL_USER,
-// // //     pass: process.env.EMAIL_PASS,
-// // //   },
-// // // });
-
-// // const transporter = nodemailer.createTransport({
-// //   host: "smtp.gmail.com",
-// //   port: 587,
-// //   secure: false,
-// //   family: 4,
-// //   auth: {
-// //     user: process.env.EMAIL_USER,
-// //     pass: process.env.EMAIL_PASS,
-// //   },
-// // });
-
-// // if (process.env.EMAIL_USER && process.env.EMAIL_PASS) {
-// //   transporter.verify((error) => {
-// //     if (error) {
-// //       console.error("❌ Transport verify failed:");
-// //       console.error(error);
-// //     } else {
-// //       console.log("✅ Mail transporter is ready.");
-// //     }
-// //   });
-// // }
-
-// // export default transporter;
