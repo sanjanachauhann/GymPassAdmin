@@ -1,3 +1,66 @@
+import dotenv from "dotenv";
+
+dotenv.config();
+
+const BREVO_URL = "https://api.brevo.com/v3/smtp/email";
+
+// Same interface as the old Nodemailer/Resend transporter,
+// so the calls in your routes (transporter.sendMail({...})) don't change.
+const transporter = {
+  async sendMail(options) {
+    const apiKey = process.env.BREVO_API_KEY;
+    const senderEmail = process.env.MAIL_FROM || process.env.EMAIL_USER;
+
+    if (!apiKey) throw new Error("BREVO_API_KEY is not configured");
+    if (!senderEmail) throw new Error("MAIL_FROM is not configured");
+
+    const recipients = (
+      Array.isArray(options.to) ? options.to : [options.to]
+    ).map((email) => ({ email }));
+
+    const body = {
+      sender: { name: "GymPass", email: senderEmail },
+      to: recipients,
+      subject: options.subject,
+    };
+
+    if (options.html) body.htmlContent = options.html;
+    if (options.text) body.textContent = options.text;
+
+    const res = await fetch(BREVO_URL, {
+      method: "POST",
+      headers: {
+        accept: "application/json",
+        "content-type": "application/json",
+        "api-key": apiKey,
+      },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(15000),
+    });
+
+    const data = await res.json().catch(() => ({}));
+
+    if (!res.ok) {
+      throw new Error(
+        `Brevo ${res.status}: ${data.message || JSON.stringify(data)}`,
+      );
+    }
+
+    return {
+      messageId: data.messageId,
+      accepted: recipients.map((r) => r.email),
+    };
+  },
+};
+
+console.log(
+  process.env.BREVO_API_KEY
+    ? "✅ Brevo mail transport configured"
+    : "❌ BREVO_API_KEY missing",
+);
+
+export default transporter;
+
 // import { Resend } from "resend";
 // import dotenv from "dotenv";
 
@@ -69,46 +132,3 @@
 // // }
 
 // // export default transporter;
-import dotenv from "dotenv";
-
-dotenv.config();
-
-const transporter = {
-  async sendMail(options) {
-    const toList = (Array.isArray(options.to) ? options.to : [options.to]).map(
-      (email) => ({ email }),
-    );
-
-    const res = await fetch("https://api.brevo.com/v3/smtp/email", {
-      method: "POST",
-      headers: {
-        "api-key": process.env.BREVO_API_KEY,
-        "Content-Type": "application/json",
-        accept: "application/json",
-      },
-      body: JSON.stringify({
-        sender: {
-          name: "GymPass",
-          email: process.env.SENDER_EMAIL || process.env.EMAIL_USER,
-        },
-        to: toList,
-        subject: options.subject,
-        htmlContent: options.html,
-        textContent: options.text,
-      }),
-    });
-
-    const data = await res.json().catch(() => ({}));
-
-    if (!res.ok) {
-      throw new Error(data.message || `Brevo error ${res.status}`);
-    }
-
-    return {
-      messageId: data.messageId,
-      accepted: options.to,
-    };
-  },
-};
-
-export default transporter;
