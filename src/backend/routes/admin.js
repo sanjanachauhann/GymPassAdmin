@@ -170,19 +170,11 @@ router.get("/applications", adminAuth, async (req, res) => {
 // PUT /api/admin/applications/:id/approve
 
 router.put("/applications/:id/approve", adminAuth, async (req, res) => {
-  const session = await mongoose.startSession();
-
   try {
-    session.startTransaction();
-
-    const request = await GymPartnerRequest.findById(req.params.id).session(
-      session,
-    );
+    // ---------- 1. Validate (nothing is written yet) ----------
+    const request = await GymPartnerRequest.findById(req.params.id);
 
     if (!request) {
-      await session.abortTransaction();
-      session.endSession();
-
       return res.status(404).json({
         success: false,
         message: "Application not found",
@@ -190,9 +182,6 @@ router.put("/applications/:id/approve", adminAuth, async (req, res) => {
     }
 
     if (request.status !== "pending") {
-      await session.abortTransaction();
-      session.endSession();
-
       return res.status(400).json({
         success: false,
         message: "Application already processed",
@@ -201,120 +190,163 @@ router.put("/applications/:id/approve", adminAuth, async (req, res) => {
 
     console.log("Approving application:", request.email);
 
-    // Check whether partner already exists
     const existingPartner = await Partner.findOne({
       email: request.email,
-    }).session(session);
+    });
 
     if (existingPartner) {
-      await session.abortTransaction();
-      session.endSession();
-
       return res.status(400).json({
         success: false,
         message: "Partner already exists.",
       });
     }
 
-    // Generate partner invitation token
+    // ---------- 2. Send the invitation email first ----------
     const inviteToken = crypto.randomBytes(32).toString("hex");
-
-    // Create partner
-    const partner = await Partner.create(
-      [
-        {
-          ownerName: request.ownerName,
-          email: request.email,
-          phone: request.phone,
-
-          password: null,
-
-          status: "invited",
-
-          inviteToken,
-
-          inviteExpires: new Date(Date.now() + 24 * 60 * 60 * 1000),
-        },
-      ],
-      { session },
-    );
-
-    // Create gym
-    const gymData = {
-      partnerId: partner[0]._id,
-      placeId: request.placeId,
-      gymName: request.gymName,
-      address: request.address,
-      rating: request.rating,
-      photos: request.photos,
-      passes: request.passes,
-    };
-
-    console.log("Gym data:", gymData);
-
-    const gymDoc = new Gym(gymData);
-
-    await gymDoc.save({ session });
-
-    console.log("Gym created:", gymDoc._id);
-
-    // Mark application approved
-    request.status = "approved";
-
-    await request.save({ session });
-
-    // Commit transaction
-    await session.commitTransaction();
-    session.endSession();
-
-    // ==================================================
-    // SEND PARTNER INVITATION EMAIL
-    // ==================================================
-
     const inviteLink = `gympasspartners://setup-password?token=${inviteToken}`;
 
     try {
       console.log("Partner invite link:", inviteLink);
+
       await transporter.sendMail({
         from: process.env.EMAIL_USER,
         to: request.email,
         subject: "GymPass Partner Approved",
 
         html: `
-            <h2>Congratulations!</h2>
+              <h2>Welcome to GymPass Partners</h2>
 
-            <p>Your GymPass application has been approved.</p>
+    <p>Hello ${request.ownerName},</p>
 
-            <p>Click below to activate your account.</p>
+    <p>
+      Congratulations! Your GymPass application has been approved.
+    </p>
 
-            <a href="${inviteLink}">
-              Activate Account
-            </a>
+    <p>
+      Click below to create your password and activate your account:
+    </p>
 
-            <p>This link expires in 24 hours.</p>
-          `,
+    <a
+      href="${inviteLink}"
+      style="
+        display:inline-block;
+        padding:12px 20px;
+        background:#23ee09;
+        color:#000;
+        text-decoration:none;
+        border-radius:8px;
+        font-weight:bold;
+      "
+    >
+      Set Password
+    </a>
+
+    <p>
+      This invitation expires in 24 hours.
+    </p>
+        `,
       });
     } catch (mailError) {
       console.error("Partner invitation email failed:", mailError);
+
+      // Nothing was created, and the application stays "pending",
+      // so the admin can simply try approving again.
+      return res.status(500).json({
+        success: false,
+        message: "Could not send invitation email",
+      });
     }
 
-    return res.json({
-      success: true,
-      partner: partner[0],
-      gym: gymDoc,
-      request,
-    });
+    // ---------- 3. Email sent: now create everything in the database ----------
+    const session = await mongoose.startSession();
+
+    try {
+      session.startTransaction();
+
+      // Re-check inside the transaction in case it was approved meanwhile
+      const freshRequest = await GymPartnerRequest.findById(
+        req.params.id,
+      ).session(session);
+
+      if (!freshRequest || freshRequest.status !== "pending") {
+        await session.abortTransaction();
+        session.endSession();
+
+        return res.status(400).json({
+          success: false,
+          message: "Application already processed",
+        });
+      }
+
+      const partner = await Partner.create(
+        [
+          {
+            ownerName: freshRequest.ownerName,
+            email: freshRequest.email,
+            phone: freshRequest.phone,
+
+            password: null,
+
+            status: "invited",
+
+            inviteToken,
+
+            inviteExpires: new Date(Date.now() + 24 * 60 * 60 * 1000),
+          },
+        ],
+        { session },
+      );
+
+      const gymData = {
+        partnerId: partner[0]._id,
+        placeId: freshRequest.placeId,
+        gymName: freshRequest.gymName,
+        address: freshRequest.address,
+        rating: freshRequest.rating,
+        photos: freshRequest.photos,
+        passes: freshRequest.passes,
+      };
+
+      console.log("Gym data:", gymData);
+
+      const gymDoc = new Gym(gymData);
+
+      await gymDoc.save({ session });
+
+      console.log("Gym created:", gymDoc._id);
+
+      freshRequest.status = "approved";
+
+      await freshRequest.save({ session });
+
+      await session.commitTransaction();
+      session.endSession();
+
+      return res.json({
+        success: true,
+        partner: partner[0],
+        gym: gymDoc,
+        request: freshRequest,
+      });
+    } catch (dbError) {
+      console.error("Partner creation failed after email was sent:", dbError);
+
+      if (session.inTransaction()) {
+        await session.abortTransaction();
+      }
+
+      session.endSession();
+
+      return res.status(500).json({
+        success: false,
+        message: dbError.message,
+      });
+    }
   } catch (error) {
     console.error("====================");
     console.error(error);
     console.error(error.stack);
     console.error("====================");
-
-    if (session.inTransaction()) {
-      await session.abortTransaction();
-    }
-
-    session.endSession();
 
     return res.status(500).json({
       success: false,
@@ -322,6 +354,160 @@ router.put("/applications/:id/approve", adminAuth, async (req, res) => {
     });
   }
 });
+
+// router.put("/applications/:id/approve", adminAuth, async (req, res) => {
+//   const session = await mongoose.startSession();
+
+//   try {
+//     session.startTransaction();
+
+//     const request = await GymPartnerRequest.findById(req.params.id).session(
+//       session,
+//     );
+
+//     if (!request) {
+//       await session.abortTransaction();
+//       session.endSession();
+
+//       return res.status(404).json({
+//         success: false,
+//         message: "Application not found",
+//       });
+//     }
+
+//     if (request.status !== "pending") {
+//       await session.abortTransaction();
+//       session.endSession();
+
+//       return res.status(400).json({
+//         success: false,
+//         message: "Application already processed",
+//       });
+//     }
+
+//     console.log("Approving application:", request.email);
+
+//     // Check whether partner already exists
+//     const existingPartner = await Partner.findOne({
+//       email: request.email,
+//     }).session(session);
+
+//     if (existingPartner) {
+//       await session.abortTransaction();
+//       session.endSession();
+
+//       return res.status(400).json({
+//         success: false,
+//         message: "Partner already exists.",
+//       });
+//     }
+
+//     // Generate partner invitation token
+//     const inviteToken = crypto.randomBytes(32).toString("hex");
+
+//     // Create partner
+//     const partner = await Partner.create(
+//       [
+//         {
+//           ownerName: request.ownerName,
+//           email: request.email,
+//           phone: request.phone,
+
+//           password: null,
+
+//           status: "invited",
+
+//           inviteToken,
+
+//           inviteExpires: new Date(Date.now() + 24 * 60 * 60 * 1000),
+//         },
+//       ],
+//       { session },
+//     );
+
+//     // Create gym
+//     const gymData = {
+//       partnerId: partner[0]._id,
+//       placeId: request.placeId,
+//       gymName: request.gymName,
+//       address: request.address,
+//       rating: request.rating,
+//       photos: request.photos,
+//       passes: request.passes,
+//     };
+
+//     console.log("Gym data:", gymData);
+
+//     const gymDoc = new Gym(gymData);
+
+//     await gymDoc.save({ session });
+
+//     console.log("Gym created:", gymDoc._id);
+
+//     // Mark application approved
+//     request.status = "approved";
+
+//     await request.save({ session });
+
+//     // Commit transaction
+//     await session.commitTransaction();
+//     session.endSession();
+
+//     // ==================================================
+//     // SEND PARTNER INVITATION EMAIL
+//     // ==================================================
+
+//     const inviteLink = `gympasspartners://setup-password?token=${inviteToken}`;
+
+//     try {
+//       console.log("Partner invite link:", inviteLink);
+//       await transporter.sendMail({
+//         from: process.env.EMAIL_USER,
+//         to: request.email,
+//         subject: "GymPass Partner Approved",
+
+//         html: `
+//             <h2>Congratulations!</h2>
+
+//             <p>Your GymPass application has been approved.</p>
+
+//             <p>Click below to activate your account.</p>
+
+//             <a href="${inviteLink}">
+//               Activate Account
+//             </a>
+
+//             <p>This link expires in 24 hours.</p>
+//           `,
+//       });
+//     } catch (mailError) {
+//       console.error("Partner invitation email failed:", mailError);
+//     }
+
+//     return res.json({
+//       success: true,
+//       partner: partner[0],
+//       gym: gymDoc,
+//       request,
+//     });
+//   } catch (error) {
+//     console.error("====================");
+//     console.error(error);
+//     console.error(error.stack);
+//     console.error("====================");
+
+//     if (session.inTransaction()) {
+//       await session.abortTransaction();
+//     }
+
+//     session.endSession();
+
+//     return res.status(500).json({
+//       success: false,
+//       message: error.message,
+//     });
+//   }
+// });
 
 // router.put("/applications/:id/approve", adminAuth, async (req, res) => {
 //   try {
