@@ -203,8 +203,10 @@ router.put("/applications/:id/approve", adminAuth, async (req, res) => {
 
     // ---------- 2. Send the invitation email first ----------
     const inviteToken = crypto.randomBytes(32).toString("hex");
-    const inviteLink = `gympasspartners://setup-password?token=${inviteToken}`;
-
+    // const inviteLink = `gympasspartners://setup-password?token=${inviteToken}`;
+    const baseUrl =
+      process.env.PUBLIC_API_URL || "https://gympasspartners.onrender.com";
+    const inviteLink = `${baseUrl}/api/admin/open-setup-password?token=${inviteToken}`;
     try {
       console.log("Partner invite link:", inviteLink);
 
@@ -1095,6 +1097,51 @@ router.get("/payments", adminAuth, async (req, res) => {
       message: "Failed to load payments",
     });
   }
+});
+
+// Public page opened from the invitation email; hands the token to the app.
+// GET /api/admin/open-setup-password?token=...
+router.get("/open-setup-password", (req, res) => {
+  const token = String(req.query.token || "");
+
+  // Invite tokens are 64 hex chars; reject anything else (also prevents HTML injection)
+  if (!/^[a-f0-9]{64}$/i.test(token)) {
+    return res.status(400).send("Invalid invitation link.");
+  }
+
+  const appLink = `gympasspartners://setup-password?token=${token}`;
+  const fallback = encodeURIComponent(
+    process.env.APP_DOWNLOAD_URL || "https://gympasspartners.onrender.com",
+  );
+  const intentLink =
+    `intent://setup-password?token=${token}` +
+    `#Intent;scheme=gympasspartners;package=com.sanjanachauhann1.gympasspartners;` +
+    `S.browser_fallback_url=${fallback};end`;
+
+  res.type("html").send(`<!doctype html>
+<html><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Open GymPass Partners</title>
+<style>
+  body{margin:0;font-family:system-ui,sans-serif;background:#000;color:#fff;display:flex;
+       min-height:100vh;align-items:center;justify-content:center;text-align:center}
+  main{max-width:380px;padding:24px} p{color:#bbb}
+  a.btn{display:inline-block;margin:16px 0;padding:14px 28px;background:#23ee09;color:#000;
+        border-radius:10px;font-weight:700;text-decoration:none}
+</style></head>
+<body><main>
+  <h2>Set up your password</h2>
+  <p>Tap below to open the GymPass Partners app.</p>
+  <a class="btn" id="open" href="${appLink}">Open the app</a>
+  <p><small>App not installed? Install it first, then tap this button again.</small></p>
+</main>
+<script>
+  var isAndroid = /android/i.test(navigator.userAgent);
+  var target = isAndroid ? "${intentLink}" : "${appLink}";
+  document.getElementById("open").setAttribute("href", target);
+  setTimeout(function(){ window.location.href = target; }, 300);
+</script>
+</body></html>`);
 });
 
 export default router;
