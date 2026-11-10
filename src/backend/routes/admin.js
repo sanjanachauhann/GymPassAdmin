@@ -204,8 +204,7 @@ router.put("/applications/:id/approve", adminAuth, async (req, res) => {
     // ---------- 2. Send the invitation email first ----------
     const inviteToken = crypto.randomBytes(32).toString("hex");
     // const inviteLink = `gympasspartners://setup-password?token=${inviteToken}`;
-    const baseUrl =
-      process.env.PUBLIC_API_URL || "https://gympasspartners.onrender.com";
+    const baseUrl = process.env.VITE_API_BASE_URL;
     const inviteLink = `${baseUrl}/api/admin/open-setup-password?token=${inviteToken}`;
     try {
       console.log("Partner invite link:", inviteLink);
