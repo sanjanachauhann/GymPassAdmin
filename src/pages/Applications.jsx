@@ -86,50 +86,6 @@ export default function Applications({ onRefreshComplete }) {
           No applications found.
         </div>
       )}
-
-      {/* <table>
-
-        <thead>
-          <tr>
-            <th>Gym</th>
-            <th>Owner</th>
-            <th>City</th>
-            <th>Plans</th>
-            <th>Status</th>
-            <th>Date</th>
-          </tr>
-        </thead>
-
-        <tbody>
-<tbody>
-  {gyms.map((gym) => (
-    <tr
-      key={gym._id}
-      onClick={() => setSelectedGym(gym)}
-      style={{ cursor: "pointer" }}
-    >
-      <td>{gym.gymName}</td>
-
-      <td>{gym.partnerId}</td>
-
-      <td>{gym.address}</td>
-
-      <td>{Object.keys(gym.passes).length}</td>
-
-      <td>
-        <span className={`badge ${gym.status.toLowerCase()}`}>
-          {gym.status}
-        </span>
-      </td>
-
-      <td>{new Date(gym.createdAt).toLocaleDateString()}</td>
-    </tr>
-  ))}
-</tbody>
-
-        </tbody>
-
-      </table> */}
 {!loading && gyms.length > 0 && (
 <div className="cards">
   {gyms.map((gym) => (
@@ -229,40 +185,7 @@ export default function Applications({ onRefreshComplete }) {
   ))}
 </div>
 )}
-{/* <ApplicationDrawer
-    gym={selectedGym}
-    onClose={() => setSelectedGym(null)}
-/> */}
 
-{/* <ApplicationDrawer
-  gym={selectedGym}
-  onClose={() => setSelectedGym(null)}
-  onApprove={async (id) => {
-    const ok = window.confirm("Approve this gym?");
-    if (!ok) return;
-    try {
-      await approveApplication(id);
-      await loadApplications();
-      setSelectedGym(null);
-    } catch (err) {
-      console.log(err);
-      alert("Failed to approve application");
-    }
-  }}
-  onReject={async (id) => {
-    const ok = window.confirm("Reject this application?");
-    if (!ok) return;
-
-    try {
-      await rejectApplication(id);
-      await loadApplications();
-      setSelectedGym(null);
-    } catch (err) {
-      console.log(err);
-      alert("Failed to reject application");
-    }
-  }}
-/> */}
 <ApplicationDrawer
   gym={selectedGym}
   processingAction={processingAction}

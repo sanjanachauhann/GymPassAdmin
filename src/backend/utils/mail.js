@@ -2,16 +2,6 @@ import dotenv from "dotenv";
 
 dotenv.config();
 
-// Sends mail through the Gmail API over HTTPS (port 443), so Render's
-// SMTP-port block doesn't apply. Same interface as the old transporter:
-//   transporter.sendMail({ to, subject, html, text })
-//
-// Required env vars on Render:
-//   EMAIL_USER           the Gmail address that sends (e.g. gympassadmin@gmail.com)
-//   GMAIL_CLIENT_ID      OAuth client id from Google Cloud
-//   GMAIL_CLIENT_SECRET  OAuth client secret
-//   GMAIL_REFRESH_TOKEN  refresh token for EMAIL_USER (scope: gmail.send)
-
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const SEND_URL = "https://gmail.googleapis.com/gmail/v1/users/me/messages/send";
 
